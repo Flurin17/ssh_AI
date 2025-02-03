@@ -1,6 +1,25 @@
 import os
 import paramiko
+import anthropic
 from dotenv import load_dotenv
+
+def get_command_from_claude(goal):
+    """Get SSH command from Claude based on the given goal"""
+    client = anthropic.Anthropic(api_key=os.getenv('ANTHROPIC_API_KEY'))
+    
+    prompt = f"""Given the following goal for a Linux system, provide only the exact shell command needed (no explanations):
+    Goal: {goal}
+    Return only the command, nothing else."""
+    
+    message = client.messages.create(
+        model="claude-3-sonnet-20240229",
+        max_tokens=100,
+        temperature=0,
+        system="You are a Linux system administration expert. Provide only the exact command needed, no explanations.",
+        messages=[{"role": "user", "content": prompt}]
+    )
+    
+    return message.content
 
 def create_ssh_session():
     """Create and return a paramiko SSH session using .env credentials"""
@@ -39,9 +58,21 @@ if __name__ == "__main__":
     
     if ssh_session:
         try:
-            # Example command execution
-            stdin, stdout, stderr = ssh_session.exec_command('ls -la')
-            print("\nCommand output:")
-            print(stdout.read().decode())
+            # Get goal from user
+            goal = input("Enter your goal (e.g., 'list all running processes'): ")
+            
+            # Get command from Claude
+            command = get_command_from_claude(goal)
+            print(f"\nGenerated command: {command}")
+            
+            # Execute the command
+            confirm = input("\nDo you want to execute this command? (y/n): ")
+            if confirm.lower() == 'y':
+                stdin, stdout, stderr = ssh_session.exec_command(command)
+                print("\nCommand output:")
+                print(stdout.read().decode())
+                if stderr.read():
+                    print("\nErrors:")
+                    print(stderr.read().decode())
         finally:
             ssh_session.close()
