@@ -168,8 +168,8 @@ if __name__ == "__main__":
                                 has_errors = True
                                 break
                         
-                        # Only check processing status if no errors occurred
-                        if not has_errors and parsed['status'] == 'PROCESSING':
+                        # Continue processing until status is FINISHED or there are errors
+                        while not has_errors and parsed['status'] == 'PROCESSING':
                             print("\nClaude requested to see the output. Sending results for further analysis...")
                             combined_output = "\n---\n".join(all_outputs)
                             
@@ -178,32 +178,43 @@ if __name__ == "__main__":
                             new_response = get_command_from_claude(goal, combined_output)
                             new_parsed = parse_claude_response(new_response)
                             
-                            if new_parsed:
-                                print(f"\nNew thinking process: {new_parsed['thinking']}")
-                                if new_parsed['commands']:
-                                    print("\nAdditional commands suggested:")
-                                    for i, cmd in enumerate(new_parsed['commands'], 1):
-                                        print(f"{i}. {cmd}")
+                            if not new_parsed:
+                                break
+                                
+                            parsed = new_parsed  # Update parsed for next iteration
+                            print(f"\nNew thinking process: {parsed['thinking']}")
+                            
+                            if parsed['commands']:
+                                print("\nAdditional commands suggested:")
+                                for i, cmd in enumerate(parsed['commands'], 1):
+                                    print(f"{i}. {cmd}")
+                                
+                                confirm = input("\nDo you want to execute these additional commands? (y/n): ")
+                                if confirm.lower() != 'y':
+                                    break
                                     
-                                    confirm = input("\nDo you want to execute these additional commands? (y/n): ")
-                                    if confirm.lower() == 'y':
-                                        for cmd in new_parsed['commands']:
-                                            print(f"\nExecuting: {cmd}")
-                                            # Execute command with sudo if needed
-                                            channel = ssh_session.get_transport().open_session()
-                                            channel.get_pty()
-                                            if cmd.strip().startswith(('systemctl', 'service', 'mount', 'umount', 'fdisk', 'apt', 'apt-get', 'dpkg', 'useradd', 'usermod', 'userdel')):
-                                                channel.exec_command(f'echo {os.getenv("SSH_PASSWORD")} | sudo -S {cmd}')
-                                            else:
-                                                channel.exec_command(cmd)
-                                            print("Output:")
-                                            output = channel.makefile().read().decode()
-                                            print(output)
-                                            stderr_output = channel.makefile_stderr().read().decode()
-                                            channel.close()
-                                            if stderr_output:
-                                                print("Errors:")
-                                                print(stderr_output)
+                                for cmd in parsed['commands']:
+                                    print(f"\nExecuting: {cmd}")
+                                    # Execute command with sudo if needed
+                                    channel = ssh_session.get_transport().open_session()
+                                    channel.get_pty()
+                                    if cmd.strip().startswith(('systemctl', 'service', 'mount', 'umount', 'fdisk', 'apt', 'apt-get', 'dpkg', 'useradd', 'usermod', 'userdel')):
+                                        channel.exec_command(f'echo {os.getenv("SSH_PASSWORD")} | sudo -S {cmd}')
+                                    else:
+                                        channel.exec_command(cmd)
+                                    print("Output:")
+                                    output = channel.makefile().read().decode()
+                                    print(output)
+                                    stderr_output = channel.makefile_stderr().read().decode()
+                                    channel.close()
+                                    
+                                    if stderr_output:
+                                        print("Errors:")
+                                        print(stderr_output)
+                                        has_errors = True
+                                        break
+                                    
+                                    all_outputs.append(f"Command: {cmd}\nOutput: {output}\nErrors: {stderr_output}")
                 
                 print("\n" + "="*50)
         finally:
