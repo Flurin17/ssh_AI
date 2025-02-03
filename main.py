@@ -102,18 +102,9 @@ if __name__ == "__main__":
                     # Execute commands if user confirms
                     confirm = input("\nDo you want to execute these commands? (y/n): ")
                     if confirm.lower() == 'y':
-                        for cmd in parsed['commands']:
-                            print(f"\nExecuting: {cmd}")
-                            stdin, stdout, stderr = ssh_session.exec_command(cmd)
-                            print("Output:")
-                            print(stdout.read().decode())
-                            stderr_output = stderr.read().decode()
-                            if stderr_output:
-                                print("Errors:")
-                                print(stderr_output)
-                        
-                        # Collect all command outputs
                         all_outputs = []
+                        has_errors = False
+                        
                         for cmd in parsed['commands']:
                             print(f"\nExecuting: {cmd}")
                             stdin, stdout, stderr = ssh_session.exec_command(cmd)
@@ -125,11 +116,39 @@ if __name__ == "__main__":
                             if stderr_output:
                                 print("Errors:")
                                 print(stderr_output)
+                                has_errors = True
                             
                             all_outputs.append(f"Command: {cmd}\nOutput: {output}\nErrors: {stderr_output}")
+                            
+                            # If there's an error, break the loop and consult Claude
+                            if has_errors:
+                                print("\nEncountered an error. Consulting Claude for assistance...")
+                                combined_output = "\n---\n".join(all_outputs)
+                                new_response = get_command_from_claude(goal, combined_output)
+                                new_parsed = parse_claude_response(new_response)
+                                
+                                if new_parsed:
+                                    print(f"\nNew thinking process: {new_parsed['thinking']}")
+                                    if new_parsed['commands']:
+                                        print("\nNew commands suggested:")
+                                        for i, cmd in enumerate(new_parsed['commands'], 1):
+                                            print(f"{i}. {cmd}")
+                                        
+                                        confirm = input("\nDo you want to execute these new commands? (y/n): ")
+                                        if confirm.lower() == 'y':
+                                            for cmd in new_parsed['commands']:
+                                                print(f"\nExecuting: {cmd}")
+                                                stdin, stdout, stderr = ssh_session.exec_command(cmd)
+                                                print("Output:")
+                                                print(stdout.read().decode())
+                                                stderr_output = stderr.read().decode()
+                                                if stderr_output:
+                                                    print("Errors:")
+                                                    print(stderr_output)
+                                break
                         
-                        # Check if Claude wants to see the output
-                        if parsed['status'] == 'PROCESSING':
+                        # Only check processing status if no errors occurred
+                        if not has_errors and parsed['status'] == 'PROCESSING':
                             print("\nClaude requested to see the output. Sending results for further analysis...")
                             combined_output = "\n---\n".join(all_outputs)
                             
