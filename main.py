@@ -138,8 +138,8 @@ if __name__ == "__main__":
                             
                             all_outputs.append(f"Command: {cmd}\nOutput: {output}\nErrors: {stderr_output}")
                             
-                            # If there's an error, break the loop and consult Claude
-                            if has_errors:
+                            # If there's an error, immediately consult Claude
+                            if stderr_output:
                                 print("\nEncountered an error. Consulting Claude for assistance...")
                                 combined_output = "\n---\n".join(all_outputs)
                                 new_response = get_command_from_claude(goal, combined_output)
@@ -154,21 +154,25 @@ if __name__ == "__main__":
                                         
                                         confirm = input("\nDo you want to execute these new commands? (y/n): ")
                                         if confirm.lower() == 'y':
-                                            for cmd in new_parsed['commands']:
-                                                print(f"\nExecuting: {cmd}")
+                                            for new_cmd in new_parsed['commands']:
+                                                print(f"\nExecuting: {new_cmd}")
                                                 # Execute sudo command without printing password
-                                                channel = ssh_session.get_transport().open_session()
-                                                channel.get_pty()
-                                                channel.exec_command(f'sudo -S {cmd}')
-                                                channel.send(os.getenv('SSH_PASSWORD') + '\n')
+                                                new_channel = ssh_session.get_transport().open_session()
+                                                new_channel.get_pty()
+                                                new_channel.exec_command(f'sudo -S {new_cmd}')
+                                                new_channel.send(os.getenv('SSH_PASSWORD') + '\n')
                                                 print("Output:")
-                                                output = channel.makefile().read().decode()
-                                                print(output)
-                                                stderr_output = channel.makefile_stderr().read().decode()
-                                                channel.close()
-                                                if stderr_output:
+                                                new_output = new_channel.makefile().read().decode()
+                                                print(new_output)
+                                                new_stderr = new_channel.makefile_stderr().read().decode()
+                                                new_channel.close()
+                                                if new_stderr:
                                                     print("Errors:")
-                                                    print(stderr_output)
+                                                    print(new_stderr)
+                                                    # If there's still an error, continue consulting Claude
+                                                    all_outputs.append(f"Command: {new_cmd}\nOutput: {new_output}\nErrors: {new_stderr}")
+                                                    break
+                                has_errors = True
                                 break
                         
                         # Only check processing status if no errors occurred
