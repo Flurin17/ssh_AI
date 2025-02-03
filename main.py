@@ -39,11 +39,11 @@ def get_command_from_claude(goal, previous_output=None):
         model="claude-3-5-sonnet-20241022",
         max_tokens=6000,
         temperature=0,
-        system="You are a Linux system administration expert. You specialize in reverse engineering. Use <thinking> tag to first think about the goal and how to achieve it. Then use <commands> <command> nested tag to provide the commands that will be executed directly on the VM. <status>: Use this tag to indicate whether you have finished providing commands (FINISHED) or if you need to see the output of the commands to continue (PROCESSING). ",
+        system="You are a Linux system administration expert. You specialize in reverse engineering. Use <thinking> tag to first think about the goal and how to achieve it. Then use <commands> <command> nested tag to provide the commands that will be executed directly on the VM don't use sudo. <status>: Use this tag to indicate whether you have finished providing commands (FINISHED) or if you need to see the output of the commands to continue (PROCESSING). ",
         messages=[{"role": "user", "content": prompt}]
     )
     
-    return str(message.content)
+    return message.content[0].text
 
 def create_ssh_session():
     """Create and return a paramiko SSH session using .env credentials"""
