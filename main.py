@@ -29,16 +29,12 @@ def get_command_from_claude(goal):
     """Get SSH commands from Claude based on the given goal"""
     client = anthropic.Anthropic()
     
-    prompt = f"""Given the following goal for a Linux system, provide your response with XML tags:
-    Goal: {goal}
-    Use <thinking> to explain your approach, <commands> with nested <command> for each command, and <status> for execution status."""
-    
     message = client.messages.create(
         model="claude-3-sonnet-20241022",
         max_tokens=100,
         temperature=0,
-        system="You are a Linux system administration expert. You specialize in reverse engineering. Use <thinking> tag to first think about the goal then use <commands><command> tag to provide the commands that will be executed. Use <status> tag to say either you are FINISHED or WORKING want to execute the commands and see the output. ",
-        messages=[{"role": "user", "content": prompt}]
+        system="You are a Linux system administration expert. You specialize in reverse engineering. Use <thinking> tag to first think about the goal then use <commands> <command> nested tag to provide the commands that will be executed. Use <status> tag to say either you are FINISHED or WORKING want to execute the commands and see the output. ",
+        messages=[{"role": "user", "content": goal}]
     )
     
     return message.content
