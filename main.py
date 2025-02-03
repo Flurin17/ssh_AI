@@ -5,17 +5,17 @@ from dotenv import load_dotenv
 
 def get_command_from_claude(goal):
     """Get SSH command from Claude based on the given goal"""
-    client = anthropic.Anthropic(api_key=os.getenv('ANTHROPIC_API_KEY'))
+    client = anthropic.Anthropic()
     
     prompt = f"""Given the following goal for a Linux system, provide only the exact shell command needed (no explanations):
     Goal: {goal}
     Return only the command, nothing else."""
     
     message = client.messages.create(
-        model="claude-3-sonnet-20240229",
+        model="claude-3-sonnet-20241022",
         max_tokens=100,
         temperature=0,
-        system="You are a Linux system administration expert. Provide only the exact command needed, no explanations.",
+        system="You are a Linux system administration expert. You specialize in reverse engineering. Use <thinking> tag to first think about the goal then use <commands><command> tag to provide the commands that will be executed. Use <status> tag to say either you are FINISHED or WORKING want to execute the commands and see the output. ",
         messages=[{"role": "user", "content": prompt}]
     )
     
