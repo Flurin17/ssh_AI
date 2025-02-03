@@ -77,9 +77,12 @@ def create_ssh_session():
         if stderr.read():
             print("Setting up sudo session...")
             # Set up sudo session
-            stdin, stdout, stderr = ssh.exec_command('sudo -S -p "" true', get_pty=True)
-            stdin.write(password + '\n')
-            stdin.flush()
+            # Set up sudo session without printing password
+            channel = ssh.get_transport().open_session()
+            channel.get_pty()
+            channel.exec_command('sudo -S -p "" true')
+            channel.send(password + '\n')
+            channel.close()
         
         return ssh
     except Exception as e:
@@ -117,9 +120,14 @@ if __name__ == "__main__":
                         
                         for cmd in parsed['commands']:
                             print(f"\nExecuting: {cmd}")
-                            stdin, stdout, stderr = ssh_session.exec_command(f'sudo -S {cmd}', get_pty=True)
-                            stdin.write(os.getenv('SSH_PASSWORD') + '\n')
-                            stdin.flush()
+                            # Execute sudo command without printing password
+                            channel = ssh_session.get_transport().open_session()
+                            channel.get_pty()
+                            channel.exec_command(f'sudo -S {cmd}')
+                            channel.send(os.getenv('SSH_PASSWORD') + '\n')
+                            output = channel.makefile().read().decode()
+                            stderr_output = channel.makefile_stderr().read().decode()
+                            channel.close()
                             output = stdout.read().decode()
                             stderr_output = stderr.read().decode()
                             
@@ -150,12 +158,16 @@ if __name__ == "__main__":
                                         if confirm.lower() == 'y':
                                             for cmd in new_parsed['commands']:
                                                 print(f"\nExecuting: {cmd}")
-                                                stdin, stdout, stderr = ssh_session.exec_command(f'sudo -S {cmd}', get_pty=True)
-                                                stdin.write(os.getenv('SSH_PASSWORD') + '\n')
-                                                stdin.flush()
+                                                # Execute sudo command without printing password
+                                                channel = ssh_session.get_transport().open_session()
+                                                channel.get_pty()
+                                                channel.exec_command(f'sudo -S {cmd}')
+                                                channel.send(os.getenv('SSH_PASSWORD') + '\n')
                                                 print("Output:")
-                                                print(stdout.read().decode())
-                                                stderr_output = stderr.read().decode()
+                                                output = channel.makefile().read().decode()
+                                                print(output)
+                                                stderr_output = channel.makefile_stderr().read().decode()
+                                                channel.close()
                                                 if stderr_output:
                                                     print("Errors:")
                                                     print(stderr_output)
@@ -182,12 +194,16 @@ if __name__ == "__main__":
                                     if confirm.lower() == 'y':
                                         for cmd in new_parsed['commands']:
                                             print(f"\nExecuting: {cmd}")
-                                            stdin, stdout, stderr = ssh_session.exec_command(f'sudo -S {cmd}', get_pty=True)
-                                            stdin.write(os.getenv('SSH_PASSWORD') + '\n')
-                                            stdin.flush()
+                                            # Execute sudo command without printing password
+                                            channel = ssh_session.get_transport().open_session()
+                                            channel.get_pty()
+                                            channel.exec_command(f'sudo -S {cmd}')
+                                            channel.send(os.getenv('SSH_PASSWORD') + '\n')
                                             print("Output:")
-                                            print(stdout.read().decode())
-                                            stderr_output = stderr.read().decode()
+                                            output = channel.makefile().read().decode()
+                                            print(output)
+                                            stderr_output = channel.makefile_stderr().read().decode()
+                                            channel.close()
                                             if stderr_output:
                                                 print("Errors:")
                                                 print(stderr_output)
