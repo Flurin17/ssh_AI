@@ -76,7 +76,3 @@ The tool automatically handles sudo privileges for common system administration 
 ## Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request.
-
-## License
-
-[Your chosen license]
