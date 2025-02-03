@@ -25,16 +25,21 @@ def parse_claude_response(response):
         print("Failed to parse Claude's response as XML")
         return None
 
-def get_command_from_claude(goal):
-    """Get SSH commands from Claude based on the given goal"""
+def get_command_from_claude(goal, previous_output=None):
+    """Get SSH commands from Claude based on the given goal and optional previous output"""
     client = anthropic.Anthropic()
+    
+    if previous_output:
+        prompt = f"""Previous command output:\n{previous_output}\n\nContinue with goal: {goal}"""
+    else:
+        prompt = goal
     
     message = client.messages.create(
         model="claude-3-sonnet-20241022",
         max_tokens=100,
         temperature=0,
         system="You are a Linux system administration expert. You specialize in reverse engineering. Use <thinking> tag to first think about the goal then use <commands> <command> nested tag to provide the commands that will be executed. Use <status> tag to say either you are FINISHED or WORKING want to execute the commands and see the output. ",
-        messages=[{"role": "user", "content": goal}]
+        messages=[{"role": "user", "content": prompt}]
     )
     
     return message.content
@@ -106,11 +111,50 @@ if __name__ == "__main__":
                                 print("Errors:")
                                 print(stderr_output)
                         
+                        # Collect all command outputs
+                        all_outputs = []
+                        for cmd in parsed['commands']:
+                            print(f"\nExecuting: {cmd}")
+                            stdin, stdout, stderr = ssh_session.exec_command(cmd)
+                            output = stdout.read().decode()
+                            stderr_output = stderr.read().decode()
+                            
+                            print("Output:")
+                            print(output)
+                            if stderr_output:
+                                print("Errors:")
+                                print(stderr_output)
+                            
+                            all_outputs.append(f"Command: {cmd}\nOutput: {output}\nErrors: {stderr_output}")
+                        
                         # Check if Claude wants to see the output
                         if parsed['status'] == 'WORKING':
                             print("\nClaude requested to see the output. Sending results for further analysis...")
-                            # Here you could implement logic to send results back to Claude
-                            # for additional command generation if needed
+                            combined_output = "\n---\n".join(all_outputs)
+                            
+                            # Get new commands based on the output
+                            print("\nAnalyzing output and generating new commands...")
+                            new_response = get_command_from_claude(goal, combined_output)
+                            new_parsed = parse_claude_response(new_response)
+                            
+                            if new_parsed:
+                                print(f"\nNew thinking process: {new_parsed['thinking']}")
+                                if new_parsed['commands']:
+                                    print("\nAdditional commands suggested:")
+                                    for i, cmd in enumerate(new_parsed['commands'], 1):
+                                        print(f"{i}. {cmd}")
+                                    
+                                    confirm = input("\nDo you want to execute these additional commands? (y/n): ")
+                                    if confirm.lower() == 'y':
+                                        for cmd in new_parsed['commands']:
+                                            print(f"\nExecuting: {cmd}")
+                                            stdin, stdout, stderr = ssh_session.exec_command(cmd)
+                                            print("Output:")
+                                            print(stdout.read().decode())
+                                            stderr_output = stderr.read().decode()
+                                            if stderr_output:
+                                                print("Errors:")
+                                                print(stderr_output)
                 
                 print("\n" + "="*50)
         finally:
