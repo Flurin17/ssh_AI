@@ -9,6 +9,7 @@ def parse_claude_response(response):
     """Parse XML tags from Claude's response"""
     # Wrap response in root element to make it valid XML
     xml_str = f"<root>{response}</root>"
+    print(xml_str)
     
     try:
         root = ET.fromstring(xml_str)
@@ -35,14 +36,14 @@ def get_command_from_claude(goal, previous_output=None):
         prompt = goal
     
     message = client.messages.create(
-        model="claude-3-sonnet-20241022",
-        max_tokens=100,
+        model="claude-3-5-sonnet-20241022",
+        max_tokens=6000,
         temperature=0,
-        system="You are a Linux system administration expert. You specialize in reverse engineering. Use <thinking> tag to first think about the goal then use <commands> <command> nested tag to provide the commands that will be executed. Use <status> tag to say either you are FINISHED or WORKING want to execute the commands and see the output. ",
+        system="You are a Linux system administration expert. You specialize in reverse engineering. Use <thinking> tag to first think about the goal and how to achieve it. Then use <commands> <command> nested tag to provide the commands that will be executed directly on the VM. <status>: Use this tag to indicate whether you have finished providing commands (FINISHED) or if you need to see the output of the commands to continue (PROCESSING). ",
         messages=[{"role": "user", "content": prompt}]
     )
     
-    return message.content
+    return str(message.content)
 
 def create_ssh_session():
     """Create and return a paramiko SSH session using .env credentials"""
@@ -128,7 +129,7 @@ if __name__ == "__main__":
                             all_outputs.append(f"Command: {cmd}\nOutput: {output}\nErrors: {stderr_output}")
                         
                         # Check if Claude wants to see the output
-                        if parsed['status'] == 'WORKING':
+                        if parsed['status'] == 'PROCESSING':
                             print("\nClaude requested to see the output. Sending results for further analysis...")
                             combined_output = "\n---\n".join(all_outputs)
                             
