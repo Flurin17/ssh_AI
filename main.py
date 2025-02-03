@@ -128,8 +128,6 @@ if __name__ == "__main__":
                             output = channel.makefile().read().decode()
                             stderr_output = channel.makefile_stderr().read().decode()
                             channel.close()
-                            output = stdout.read().decode()
-                            stderr_output = stderr.read().decode()
                             
                             print("Output:")
                             print(output)
