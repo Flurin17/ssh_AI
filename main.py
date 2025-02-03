@@ -1,15 +1,37 @@
 import os
 import paramiko
 import anthropic
+import xml.etree.ElementTree as ET
+from io import StringIO
 from dotenv import load_dotenv
 
+def parse_claude_response(response):
+    """Parse XML tags from Claude's response"""
+    # Wrap response in root element to make it valid XML
+    xml_str = f"<root>{response}</root>"
+    
+    try:
+        root = ET.fromstring(xml_str)
+        thinking = root.find('thinking').text if root.find('thinking') is not None else ""
+        commands = [cmd.text for cmd in root.findall('.//command')]
+        status = root.find('status').text if root.find('status') is not None else "FINISHED"
+        
+        return {
+            'thinking': thinking,
+            'commands': commands,
+            'status': status
+        }
+    except ET.ParseError:
+        print("Failed to parse Claude's response as XML")
+        return None
+
 def get_command_from_claude(goal):
-    """Get SSH command from Claude based on the given goal"""
+    """Get SSH commands from Claude based on the given goal"""
     client = anthropic.Anthropic()
     
-    prompt = f"""Given the following goal for a Linux system, provide only the exact shell command needed (no explanations):
+    prompt = f"""Given the following goal for a Linux system, provide your response with XML tags:
     Goal: {goal}
-    Return only the command, nothing else."""
+    Use <thinking> to explain your approach, <commands> with nested <command> for each command, and <status> for execution status."""
     
     message = client.messages.create(
         model="claude-3-sonnet-20241022",
@@ -58,21 +80,42 @@ if __name__ == "__main__":
     
     if ssh_session:
         try:
-            # Get goal from user
-            goal = input("Enter your goal (e.g., 'list all running processes'): ")
-            
-            # Get command from Claude
-            command = get_command_from_claude(goal)
-            print(f"\nGenerated command: {command}")
-            
-            # Execute the command
-            confirm = input("\nDo you want to execute this command? (y/n): ")
-            if confirm.lower() == 'y':
-                stdin, stdout, stderr = ssh_session.exec_command(command)
-                print("\nCommand output:")
-                print(stdout.read().decode())
-                if stderr.read():
-                    print("\nErrors:")
-                    print(stderr.read().decode())
+            while True:
+                # Get goal from user
+                goal = input("\nEnter your goal (e.g., 'list all running processes') or 'exit' to quit: ")
+                
+                if goal.lower() == 'exit':
+                    break
+                
+                # Get response from Claude
+                response = get_command_from_claude(goal)
+                parsed = parse_claude_response(response)
+                
+                if parsed:
+                    print(f"\nThinking process: {parsed['thinking']}")
+                    print("\nGenerated commands:")
+                    for i, cmd in enumerate(parsed['commands'], 1):
+                        print(f"{i}. {cmd}")
+                    
+                    # Execute commands if user confirms
+                    confirm = input("\nDo you want to execute these commands? (y/n): ")
+                    if confirm.lower() == 'y':
+                        for cmd in parsed['commands']:
+                            print(f"\nExecuting: {cmd}")
+                            stdin, stdout, stderr = ssh_session.exec_command(cmd)
+                            print("Output:")
+                            print(stdout.read().decode())
+                            stderr_output = stderr.read().decode()
+                            if stderr_output:
+                                print("Errors:")
+                                print(stderr_output)
+                        
+                        # Check if Claude wants to see the output
+                        if parsed['status'] == 'WORKING':
+                            print("\nClaude requested to see the output. Sending results for further analysis...")
+                            # Here you could implement logic to send results back to Claude
+                            # for additional command generation if needed
+                
+                print("\n" + "="*50)
         finally:
             ssh_session.close()
