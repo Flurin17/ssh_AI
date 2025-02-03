@@ -71,6 +71,16 @@ def create_ssh_session():
             password=password
         )
         print(f"Successfully connected to {host}")
+        
+        # Test sudo access
+        stdin, stdout, stderr = ssh.exec_command('sudo -n true')
+        if stderr.read():
+            print("Setting up sudo session...")
+            # Set up sudo session
+            stdin, stdout, stderr = ssh.exec_command('sudo -S -p "" true', get_pty=True)
+            stdin.write(password + '\n')
+            stdin.flush()
+        
         return ssh
     except Exception as e:
         print(f"Failed to connect: {str(e)}")
@@ -107,7 +117,9 @@ if __name__ == "__main__":
                         
                         for cmd in parsed['commands']:
                             print(f"\nExecuting: {cmd}")
-                            stdin, stdout, stderr = ssh_session.exec_command(cmd)
+                            stdin, stdout, stderr = ssh_session.exec_command(f'sudo -S {cmd}', get_pty=True)
+                            stdin.write(os.getenv('SSH_PASSWORD') + '\n')
+                            stdin.flush()
                             output = stdout.read().decode()
                             stderr_output = stderr.read().decode()
                             
@@ -138,7 +150,9 @@ if __name__ == "__main__":
                                         if confirm.lower() == 'y':
                                             for cmd in new_parsed['commands']:
                                                 print(f"\nExecuting: {cmd}")
-                                                stdin, stdout, stderr = ssh_session.exec_command(cmd)
+                                                stdin, stdout, stderr = ssh_session.exec_command(f'sudo -S {cmd}', get_pty=True)
+                                                stdin.write(os.getenv('SSH_PASSWORD') + '\n')
+                                                stdin.flush()
                                                 print("Output:")
                                                 print(stdout.read().decode())
                                                 stderr_output = stderr.read().decode()
@@ -168,7 +182,9 @@ if __name__ == "__main__":
                                     if confirm.lower() == 'y':
                                         for cmd in new_parsed['commands']:
                                             print(f"\nExecuting: {cmd}")
-                                            stdin, stdout, stderr = ssh_session.exec_command(cmd)
+                                            stdin, stdout, stderr = ssh_session.exec_command(f'sudo -S {cmd}', get_pty=True)
+                                            stdin.write(os.getenv('SSH_PASSWORD') + '\n')
+                                            stdin.flush()
                                             print("Output:")
                                             print(stdout.read().decode())
                                             stderr_output = stderr.read().decode()
